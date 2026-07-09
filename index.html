@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Policy Gap Analyzer — ISO 27001:2022 Annex A</title>
+<style>
+  :root{
+    --paper:#FAFAF7; --ink:#141A26; --navy:#0D1321; --amber:#FFB02E;
+    --mute:#6B7385; --line:#DDDCD4; --card:#FFFFFF;
+    --ok:#1E7F4F; --ok-bg:#E3F2EA; --part:#9A6B00; --part-bg:#FCF0D4;
+    --miss:#B3261E; --miss-bg:#F9E0DE;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5}
+  header{background:var(--navy);color:#F0F2F6;padding:28px 32px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  header h1{font-size:20px;font-weight:700;letter-spacing:.2px}
+  header .std{font-family:var(--mono);font-size:12px;color:var(--amber);letter-spacing:.14em}
+  main{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:22px;margin-bottom:20px}
+  .card h2{font-size:13px;font-family:var(--mono);letter-spacing:.12em;color:var(--mute);margin-bottom:14px;text-transform:uppercase}
+  textarea{width:100%;min-height:220px;border:1px solid var(--line);border-radius:8px;padding:14px;font-family:var(--mono);font-size:13px;resize:vertical;background:#FDFDFB;color:var(--ink)}
+  textarea:focus{outline:2px solid var(--amber);outline-offset:1px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  button{font-family:var(--sans);font-size:14px;font-weight:600;border-radius:8px;padding:10px 18px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  button:hover{border-color:var(--ink)}
+  button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  button.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+  button.primary:hover{background:#1B2536}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  select{font-size:14px;padding:9px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .hint{font-size:12.5px;color:var(--mute)}
+  .progress-wrap{display:none;margin-top:16px}
+  .progress-bar{height:8px;background:#EEEDE6;border-radius:99px;overflow:hidden}
+  .progress-fill{height:100%;width:0%;background:var(--amber);transition:width .4s ease;border-radius:99px}
+  .progress-label{font-family:var(--mono);font-size:12px;color:var(--mute);margin-top:8px}
+  .error{display:none;background:var(--miss-bg);color:var(--miss);border:1px solid #E5B5B2;border-radius:8px;padding:12px 14px;font-size:13.5px;margin-top:14px}
+  /* results */
+  #results{display:none}
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .tile .big{font-size:34px;font-weight:800;font-family:var(--mono)}
+  .tile .lbl{font-size:11.5px;font-family:var(--mono);letter-spacing:.1em;color:var(--mute);text-transform:uppercase;margin-top:2px}
+  .theme-bars{margin-bottom:4px}
+  .tbar{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .tbar .tname{width:210px;font-size:13px;flex-shrink:0}
+  .tbar .track{flex:1;height:14px;background:#EEEDE6;border-radius:99px;overflow:hidden;display:flex}
+  .tbar .seg-c{background:var(--ok)}
+  .tbar .seg-p{background:var(--amber)}
+  .tbar .pct{font-family:var(--mono);font-size:12px;width:88px;text-align:right;color:var(--mute)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);text-align:left;padding:10px 10px;border-bottom:2px solid var(--ink)}
+  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+  td.cid{font-family:var(--mono);white-space:nowrap;font-weight:600}
+  .chip{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 9px;border-radius:5px}
+  .chip.C{background:var(--ok-bg);color:var(--ok)}
+  .chip.P{background:var(--part-bg);color:var(--part)}
+  .chip.M{background:var(--miss-bg);color:var(--miss)}
+  .ev{color:var(--mute);font-style:italic}
+  .prio li{margin:0 0 8px 18px;font-size:13.5px}
+  .prio .cid{font-family:var(--mono);font-weight:700}
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .filters button.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  footer{max-width:1080px;margin:0 auto;padding:0 20px 40px;font-size:12px;color:var(--mute)}
+  @media (max-width:640px){ .tbar .tname{width:120px;font-size:12px} }
+</style>
+</head>
+<body>
+<header>
+  <h1>Policy Gap Analyzer</h1>
+  <span class="std">ISO/IEC 27001:2022 — ANNEX A (93 CONTROLS)</span>
+</header>
+<main>
+  <section class="card">
+    <h2>0 — Connect</h2>
+    <input type="password" id="apiKey" placeholder="Anthropic API key (sk-ant-…) — used from your browser only, never stored or sent anywhere except api.anthropic.com"
+      style="width:100%;border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-family:var(--mono);font-size:13px;background:#FDFDFB;color:var(--ink)">
+    <p class="hint" style="margin-top:8px">Get a key at console.anthropic.com. A full 93-control run costs a few cents. The key lives in this page's memory for this session only — refresh and it's gone.</p>
+    <div class="row">
+      <button id="testBtn">Test connection</button>
+      <span class="hint" id="testStatus"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>1 — Policy input</h2>
+    <textarea id="policyText" placeholder="Paste your organization's information security policy here, or load a file / the sample policy below."></textarea>
+    <div class="row">
+      <button class="primary" id="analyzeBtn">Analyze policy</button>
+      <select id="scopeSel" aria-label="Analysis scope">
+        <option value="ALL">All themes (93 controls)</option>
+        <option value="A.5">A.5 Organizational (37)</option>
+        <option value="A.6">A.6 People (8)</option>
+        <option value="A.7">A.7 Physical (14)</option>
+        <option value="A.8">A.8 Technological (34)</option>
+      </select>
+      <button id="fileBtn">Load .txt / .md file</button>
+      <input type="file" id="fileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none">
+      <button id="sampleBtn">Load sample policy</button>
+      <span class="hint" id="charCount"></span>
+    </div>
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">Preparing analysis…</div>
+    </div>
+    <div class="error" id="errorBox"></div>
+  </section>
+
+  <section id="results">
+    <div class="tiles">
+      <div class="tile"><div class="big" id="tCov">–</div><div class="lbl">Coverage score</div></div>
+      <div class="tile"><div class="big" id="tC" style="color:var(--ok)">–</div><div class="lbl">Covered</div></div>
+      <div class="tile"><div class="big" id="tP" style="color:var(--part)">–</div><div class="lbl">Partial</div></div>
+      <div class="tile"><div class="big" id="tM" style="color:var(--miss)">–</div><div class="lbl">Missing</div></div>
+    </div>
+
+    <div class="card theme-bars" id="themeCard">
+      <h2>Coverage by theme</h2>
+      <div id="themeBars"></div>
+    </div>
+
+    <div class="card">
+      <h2>Priority gaps — remediate first</h2>
+      <ol class="prio" id="prioList"></ol>
+    </div>
+
+    <div class="card">
+      <h2>Control ledger</h2>
+      <div class="filters" role="group" aria-label="Filter by status">
+        <button data-f="ALL" class="active">All</button>
+        <button data-f="M">Missing</button>
+        <button data-f="P">Partial</button>
+        <button data-f="C">Covered</button>
+      </div>
+      <table>
+        <thead><tr><th>Control</th><th>Title</th><th>Status</th><th>Evidence in policy</th><th>Recommendation</th></tr></thead>
+        <tbody id="ledgerBody"></tbody>
+      </table>
+      <div class="row">
+        <button id="mdBtn">Download report (.md)</button>
+        <button id="csvBtn">Download data (.csv)</button>
+      </div>
+    </div>
+  </section>
+</main>
+<footer>
+  This tool assists policy review against ISO/IEC 27001:2022 Annex A control objectives. It is not an audit opinion,
+  certification assessment, or legal advice. Verify all findings against the official standard and your organization's
+  Statement of Applicability. Control titles referenced under fair-use identification; the standard text is © ISO/IEC.
+  <br>Built by Kent Leckie — github.com/kleckie7
+</footer>
+
+<script>
+/* ============ ISO 27001:2022 Annex A catalog (IDs + short titles) ============ */
+const CATALOG=[
+["A.5.1","Policies for information security"],["A.5.2","Information security roles and responsibilities"],
+["A.5.3","Segregation of duties"],["A.5.4","Management responsibilities"],["A.5.5","Contact with authorities"],
+["A.5.6","Contact with special interest groups"],["A.5.7","Threat intelligence"],["A.5.8","Information security in project management"],
+["A.5.9","Inventory of information and other associated assets"],["A.5.10","Acceptable use of information and other associated assets"],
+["A.5.11","Return of assets"],["A.5.12","Classification of information"],["A.5.13","Labelling of information"],
+["A.5.14","Information transfer"],["A.5.15","Access control"],["A.5.16","Identity management"],
+["A.5.17","Authentication information"],["A.5.18","Access rights"],["A.5.19","Information security in supplier relationships"],
+["A.5.20","Addressing information security within supplier agreements"],["A.5.21","Managing information security in the ICT supply chain"],
+["A.5.22","Monitoring, review and change management of supplier services"],["A.5.23","Information security for use of cloud services"],
+["A.5.24","Information security incident management planning and preparation"],["A.5.25","Assessment and decision on information security events"],
+["A.5.26","Response to information security incidents"],["A.5.27","Learning from information security incidents"],
+["A.5.28","Collection of evidence"],["A.5.29","Information security during disruption"],["A.5.30","ICT readiness for business continuity"],
+["A.5.31","Legal, statutory, regulatory and contractual requirements"],["A.5.32","Intellectual property rights"],
+["A.5.33","Protection of records"],["A.5.34","Privacy and protection of PII"],["A.5.35","Independent review of information security"],
+["A.5.36","Compliance with policies, rules and standards for information security"],["A.5.37","Documented operating procedures"],
+["A.6.1","Screening"],["A.6.2","Terms and conditions of employment"],["A.6.3","Information security awareness, education and training"],
+["A.6.4","Disciplinary process"],["A.6.5","Responsibilities after termination or change of employment"],
+["A.6.6","Confidentiality or non-disclosure agreements"],["A.6.7","Remote working"],["A.6.8","Information security event reporting"],
+["A.7.1","Physical security perimeters"],["A.7.2","Physical entry"],["A.7.3","Securing offices, rooms and facilities"],
+["A.7.4","Physical security monitoring"],["A.7.5","Protecting against physical and environmental threats"],
+["A.7.6","Working in secure areas"],["A.7.7","Clear desk and clear screen"],["A.7.8","Equipment siting and protection"],
+["A.7.9","Security of assets off-premises"],["A.7.10","Storage media"],["A.7.11","Supporting utilities"],
+["A.7.12","Cabling security"],["A.7.13","Equipment maintenance"],["A.7.14","Secure disposal or re-use of equipment"],
+["A.8.1","User endpoint devices"],["A.8.2","Privileged access rights"],["A.8.3","Information access restriction"],
+["A.8.4","Access to source code"],["A.8.5","Secure authentication"],["A.8.6","Capacity management"],
+["A.8.7","Protection against malware"],["A.8.8","Management of technical vulnerabilities"],["A.8.9","Configuration management"],
+["A.8.10","Information deletion"],["A.8.11","Data masking"],["A.8.12","Data leakage prevention"],
+["A.8.13","Information backup"],["A.8.14","Redundancy of information processing facilities"],["A.8.15","Logging"],
+["A.8.16","Monitoring activities"],["A.8.17","Clock synchronization"],["A.8.18","Use of privileged utility programs"],
+["A.8.19","Installation of software on operational systems"],["A.8.20","Networks security"],["A.8.21","Security of network services"],
+["A.8.22","Segregation of networks"],["A.8.23","Web filtering"],["A.8.24","Use of cryptography"],
+["A.8.25","Secure development life cycle"],["A.8.26","Application security requirements"],
+["A.8.27","Secure system architecture and engineering principles"],["A.8.28","Secure coding"],
+["A.8.29","Security testing in development and acceptance"],["A.8.30","Outsourced development"],
+["A.8.31","Separation of development, test and production environments"],["A.8.32","Change management"],
+["A.8.33","Test information"],["A.8.34","Protection of information systems during audit testing"]
+].map(([id,title])=>({id,title,theme:id.split(".").slice(0,2).join(".")}));
+
+const THEME_NAMES={"A.5":"A.5 Organizational","A.6":"A.6 People","A.7":"A.7 Physical","A.8":"A.8 Technological"};
+const BATCH_SIZE=16;
+const MAX_POLICY_CHARS=24000;
+
+/* ============ pure logic (testable) ============ */
+function selectControls(scope){return scope==="ALL"?CATALOG.slice():CATALOG.filter(c=>c.theme===scope);}
+function chunk(arr,n){const out=[];for(let i=0;i<arr.length;i+=n)out.push(arr.slice(i,i+n));return out;}
+
+function buildPrompt(batch,policy){
+  const list=batch.map(c=>`${c.id} ${c.title}`).join("\n");
+  return `You are an ISO 27001 gap assessment assistant. Assess whether the POLICY below addresses each listed Annex A control objective.
+
+CONTROLS:
+${list}
+
+POLICY:
+<<<
+${policy}
+>>>
+
+For each control, output status: "C" (clearly addressed), "P" (mentioned but incomplete/vague), or "M" (not addressed).
+Respond with ONLY a JSON array, no markdown fences, no commentary. Schema per item:
+{"id":"A.x.y","s":"C|P|M","e":"short quote or paraphrase of policy evidence, max 12 words, empty string if M","r":"one specific remediation action, max 14 words"}
+Every control in the list must appear exactly once. Be strict: generic statements earn P, not C.`;
+}
+
+function parseModelJSON(text){
+  if(typeof text!=="string")return null;
+  let t=text.trim().replace(/```json/gi,"").replace(/```/g,"").trim();
+  const a=t.indexOf("["),b=t.lastIndexOf("]");
+  if(a===-1||b===-1||b<=a)return null;
+  try{const arr=JSON.parse(t.slice(a,b+1));return Array.isArray(arr)?arr:null;}catch(e){return null;}
+}
+
+function normalizeResults(raw,batch){
+  const valid={"C":1,"P":1,"M":1};
+  const byId={};
+  (raw||[]).forEach(it=>{
+    if(it&&typeof it.id==="string")byId[it.id.trim()]=it;
+  });
+  return batch.map(c=>{
+    const it=byId[c.id]||{};
+    const s=valid[it.s]?it.s:"M";
+    return {id:c.id,title:c.title,theme:c.theme,
+      s, e:s==="M"?"":String(it.e||"").slice(0,140),
+      r:String(it.r||"Define and document this control in policy.").slice(0,160)};
+  });
+}
+
+function score(results){
+  const t={C:0,P:0,M:0};results.forEach(r=>t[r.s]++);
+  const n=results.length||1;
+  const pct=Math.round(((t.C+0.5*t.P)/n)*100);
+  const themes={};
+  results.forEach(r=>{
+    themes[r.theme]=themes[r.theme]||{C:0,P:0,M:0,n:0};
+    themes[r.theme][r.s]++;themes[r.theme].n++;
+  });
+  return {totals:t,pct,themes,n};
+}
+
+function priorityGaps(results,limit=10){
+  const order={M:0,P:1,C:2};
+  return results.filter(r=>r.s!=="C")
+    .sort((a,b)=>order[a.s]-order[b.s]||a.id.localeCompare(b.id,undefined,{numeric:true}))
+    .slice(0,limit);
+}
+
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
+function csvCell(s){const v=String(s).replace(/"/g,'""');return `"${v}"`;}
+
+function toMarkdown(results,sc,scopeLabel){
+  const d=new Date().toISOString().slice(0,10);
+  const statusWord={C:"Covered",P:"Partial",M:"Missing"};
+  let md=`# ISO 27001:2022 Annex A — Policy Gap Assessment\n\n`;
+  md+=`**Date:** ${d}  \n**Scope:** ${scopeLabel}  \n**Coverage score:** ${sc.pct}% (Covered ${sc.totals.C} · Partial ${sc.totals.P} · Missing ${sc.totals.M} of ${sc.n})\n\n`;
+  md+=`## Priority gaps\n\n`;
+  priorityGaps(results).forEach(g=>{md+=`- **${g.id} ${g.title}** — ${statusWord[g.s]}. ${g.r}\n`;});
+  md+=`\n## Control ledger\n\n| Control | Title | Status | Evidence | Recommendation |\n|---|---|---|---|---|\n`;
+  results.forEach(r=>{md+=`| ${r.id} | ${r.title} | ${statusWord[r.s]} | ${r.e||"—"} | ${r.r} |\n`;});
+  md+=`\n---\n*Generated by Policy Gap Analyzer. Assists review only; not an audit opinion. Verify against the official standard and your SoA.*\n`;
+  return md;
+}
+
+function toCSV(results){
+  let csv="control_id,title,theme,status,evidence,recommendation\n";
+  results.forEach(r=>{csv+=[r.id,r.title,r.theme,r.s,r.e,r.r].map(csvCell).join(",")+"\n";});
+  return csv;
+}
+
+/* ============ sample policy ============ */
+const SAMPLE_POLICY=`NORTHFIELD SOFTWARE INC. — INFORMATION SECURITY POLICY (v1.2)
+
+1. Purpose and scope. This policy applies to all Northfield employees and contractors and to all company information systems.
+
+2. Roles. The Director of Operations is accountable for information security. All staff are responsible for following this policy. Violations may result in disciplinary action up to termination.
+
+3. Access control. Access to systems is granted on a least-privilege basis and approved by the resource owner. Access rights are reviewed quarterly. Shared accounts are prohibited. Access is revoked within 24 hours of termination.
+
+4. Authentication. All accounts require unique credentials and multi-factor authentication for remote and administrative access. Passwords must be at least 12 characters.
+
+5. Acceptable use. Company systems are for business purposes. Employees must not install unapproved software on company devices.
+
+6. Remote work. Remote workers must use the company VPN and keep devices locked when unattended.
+
+7. Vendor management. New vendors handling company data must complete a security questionnaire before onboarding. Contracts include confidentiality clauses.
+
+8. Backups. Production data is backed up nightly to a separate cloud region. Backup restoration is tested twice per year.
+
+9. Incident response. Suspected security incidents must be reported to the Director of Operations immediately. The company maintains an incident response runbook and reviews incidents after closure.
+
+10. Awareness. All staff complete security awareness training at hire and annually.
+
+11. Data handling. Customer data is classified as Confidential. Confidential data must not be stored on personal devices.
+
+12. Review. This policy is reviewed annually by management.`;
+
+/* ============ API ============ */
+async function callClaude(prompt){
+  const key=document.getElementById("apiKey").value.trim();
+  if(!key)throw new Error("no API key entered — paste your Anthropic API key in step 0");
+  const response=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key":key,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1500,
+      messages:[{role:"user",content:prompt}]})
+  });
+  if(!response.ok){
+    let detail="";
+    try{const err=await response.json();detail=err&&err.error&&err.error.message?" — "+err.error.message:"";}catch(e){}
+    if(response.status===401)throw new Error("API key rejected (401)"+detail);
+    throw new Error("API request failed ("+response.status+")"+detail);
+  }
+  const data=await response.json();
+  return (data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n");
+}
+
+async function analyzeBatch(batch,policy){
+  const prompt=buildPrompt(batch,policy);
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const text=await callClaude(prompt);
+      const raw=parseModelJSON(text);
+      if(raw)return normalizeResults(raw,batch);
+    }catch(e){ if(attempt===1) throw e; }
+  }
+  return normalizeResults([],batch); // fail-safe: mark batch M with generic recs
+}
+
+/* ============ UI wiring ============ */
+const $=id=>document.getElementById(id);
+let RESULTS=[],SCOPE_LABEL="";
+
+function setProgress(done,total,label){
+  $("progressWrap").style.display="block";
+  $("progressFill").style.width=Math.round((done/total)*100)+"%";
+  $("progressLabel").textContent=label;
+}
+
+function showError(msg){$("errorBox").style.display="block";$("errorBox").textContent=msg;}
+function clearError(){$("errorBox").style.display="none";}
+
+function render(results){
+  RESULTS=results;
+  const sc=score(results);
+  $("tCov").textContent=sc.pct+"%";
+  $("tC").textContent=sc.totals.C;$("tP").textContent=sc.totals.P;$("tM").textContent=sc.totals.M;
+  const bars=Object.keys(sc.themes).sort().map(k=>{
+    const t=sc.themes[k],cw=(t.C/t.n)*100,pw=(t.P/t.n)*100;
+    return `<div class="tbar"><span class="tname">${esc(THEME_NAMES[k]||k)}</span>
+      <div class="track"><div class="seg-c" style="width:${cw}%"></div><div class="seg-p" style="width:${pw}%"></div></div>
+      <span class="pct">${t.C}C · ${t.P}P · ${t.M}M</span></div>`;
+  }).join("");
+  $("themeBars").innerHTML=bars;
+  $("prioList").innerHTML=priorityGaps(results).map(g=>
+    `<li><span class="cid">${esc(g.id)}</span> ${esc(g.title)} — <span class="chip ${g.s}">${g.s==="M"?"MISSING":"PARTIAL"}</span> ${esc(g.r)}</li>`).join("")
+    ||"<li>No gaps identified in scope. Verify manually before relying on this result.</li>";
+  renderLedger("ALL");
+  $("results").style.display="block";
+  $("results").scrollIntoView({behavior:"smooth"});
+}
+
+function renderLedger(filter){
+  const word={C:"COVERED",P:"PARTIAL",M:"MISSING"};
+  $("ledgerBody").innerHTML=RESULTS
+    .filter(r=>filter==="ALL"||r.s===filter)
+    .map(r=>`<tr><td class="cid">${esc(r.id)}</td><td>${esc(r.title)}</td>
+      <td><span class="chip ${r.s}">${word[r.s]}</span></td>
+      <td class="ev">${esc(r.e)||"—"}</td><td>${esc(r.r)}</td></tr>`).join("");
+}
+
+function download(name,mime,content){
+  const blob=new Blob([content],{type:mime});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+$("analyzeBtn").addEventListener("click",async()=>{
+  clearError();
+  let policy=$("policyText").value.trim();
+  if(policy.length<200){showError("Policy text is too short to assess meaningfully. Paste the full policy (200+ characters).");return;}
+  if(policy.length>MAX_POLICY_CHARS){policy=policy.slice(0,MAX_POLICY_CHARS);showError("Note: policy truncated to "+MAX_POLICY_CHARS+" characters for analysis. Results still shown below.");}
+  const scope=$("scopeSel").value;
+  SCOPE_LABEL=$("scopeSel").selectedOptions[0].textContent;
+  const controls=selectControls(scope);
+  const batches=chunk(controls,BATCH_SIZE);
+  $("analyzeBtn").disabled=true;
+  $("results").style.display="none";
+  try{
+    const all=[];
+    for(let i=0;i<batches.length;i++){
+      setProgress(i,batches.length,`Assessing controls ${batches[i][0].id}–${batches[i][batches[i].length-1].id} (batch ${i+1} of ${batches.length})…`);
+      const res=await analyzeBatch(batches[i],policy);
+      all.push(...res);
+    }
+    setProgress(batches.length,batches.length,"Assessment complete — "+all.length+" controls evaluated.");
+    render(all);
+  }catch(e){
+    showError("Analysis stopped: "+e.message+". Check your connection and try again.");
+  }finally{
+    $("analyzeBtn").disabled=false;
+  }
+});
+
+$("testBtn").addEventListener("click",async()=>{
+  const key=$("apiKey").value.trim();
+  const st=$("testStatus");
+  if(!key){st.textContent="Enter an API key first.";return;}
+  st.textContent="Testing…";
+  try{
+    const r=await fetch("https://api.anthropic.com/v1/models/claude-sonnet-4-6",{
+      headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}});
+    if(r.ok){const m=await r.json();st.textContent="✓ Connected — "+(m.display_name||m.id)+" available. Ready to analyze.";}
+    else{
+      let detail="";try{const err=await r.json();detail=err&&err.error&&err.error.message?": "+err.error.message:"";}catch(e){}
+      st.textContent="✗ Failed ("+r.status+")"+detail;
+    }
+  }catch(e){st.textContent="✗ Network error — "+e.message;}
+});
+
+$("sampleBtn").addEventListener("click",()=>{$("policyText").value=SAMPLE_POLICY;$("policyText").dispatchEvent(new Event("input"));});
+$("fileBtn").addEventListener("click",()=>$("fileInput").click());
+$("fileInput").addEventListener("change",e=>{
+  const f=e.target.files[0];if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{$("policyText").value=String(rd.result);$("policyText").dispatchEvent(new Event("input"));};
+  rd.readAsText(f);
+});
+$("policyText").addEventListener("input",()=>{
+  const n=$("policyText").value.length;
+  $("charCount").textContent=n?n.toLocaleString()+" characters":"";
+});
+document.querySelectorAll(".filters button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".filters button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");renderLedger(b.dataset.f);
+}));
+$("mdBtn").addEventListener("click",()=>download("gap-assessment-"+new Date().toISOString().slice(0,10)+".md","text/markdown",toMarkdown(RESULTS,score(RESULTS),SCOPE_LABEL)));
+$("csvBtn").addEventListener("click",()=>download("gap-assessment-"+new Date().toISOString().slice(0,10)+".csv","text/csv",toCSV(RESULTS)));
+</script>
+</body>
+</html>
